@@ -1,0 +1,70 @@
+version: '3.8'
+
+services:
+  # ==========================================
+  # Development Container (Node.js)
+  # ==========================================
+  app:
+    build:
+      context: ..
+      dockerfile: .devcontainer/Dockerfile
+    volumes:
+      - ..:/workspace:cached
+    command: sleep infinity
+    environment:
+      MONGO_URI: mongodb://admin:password123@mongodb:27017/katalog-tools?authSource=admin
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: "9000"
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_BUCKET: tool-icons
+      MINIO_USE_SSL: "false"
+      NEXT_PUBLIC_API_URL: http://localhost:3001
+    depends_on:
+      - mongodb
+      - minio
+    networks:
+      - devnet
+
+  # ==========================================
+  # MongoDB
+  # ==========================================
+  mongodb:
+    image: mongo:7
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password123
+      MONGO_INITDB_DATABASE: katalog-tools
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_devdata:/data/db
+    networks:
+      - devnet
+
+  # ==========================================
+  # MinIO
+  # ==========================================
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_devdata:/data
+    networks:
+      - devnet
+
+volumes:
+  mongo_devdata:
+  minio_devdata:
+
+networks:
+  devnet:
+    driver: bridge

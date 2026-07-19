@@ -1,0 +1,115 @@
+version: '3.8'
+
+services:
+  # ==========================================
+  # MongoDB — Database
+  # ==========================================
+  mongodb:
+    image: mongo:7
+    container_name: katalog-mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password123
+      MONGO_INITDB_DATABASE: katalog-tools
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - app-network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ==========================================
+  # MinIO — Object Storage (Penyimpanan Gambar)
+  # ==========================================
+  minio:
+    image: minio/minio:latest
+    container_name: katalog-minio
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"   # API
+      - "9001:9001"   # Console UI
+    volumes:
+      - minio_data:/data
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ==========================================
+  # Backend — NestJS API
+  # ==========================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: katalog-backend
+    restart: unless-stopped
+    environment:
+      PORT: 3001
+      MONGO_URI: mongodb://admin:password123@mongodb:27017/katalog-tools?authSource=admin
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: 9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_BUCKET: tool-icons
+      MINIO_USE_SSL: "false"
+      FRONTEND_URL: http://localhost:3000
+      RAPIDAPI_KEY: ${RAPIDAPI_KEY:-your-rapidapi-key-here}
+      RAPIDAPI_HOST: ${RAPIDAPI_HOST:-your-rapidapi-host-here}
+      RAPIDAPI_URL: ${RAPIDAPI_URL:-https://your-rapidapi-endpoint-here}
+    ports:
+      - "3001:3001"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    networks:
+      - app-network
+
+  # ==========================================
+  # Frontend — Next.js App
+  # ==========================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: katalog-frontend
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:3001
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    networks:
+      - app-network
+
+# ==========================================
+# Volumes — Persistent Data
+# ==========================================
+volumes:
+  mongo_data:
+    driver: local
+  minio_data:
+    driver: local
+
+# ==========================================
+# Networks
+# ==========================================
+networks:
+  app-network:
+    driver: bridge
