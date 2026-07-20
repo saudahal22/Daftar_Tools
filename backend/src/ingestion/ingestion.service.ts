@@ -428,6 +428,10 @@ export class IngestionService implements OnModuleInit {
 
           // Simpan LANGSUNG ke MongoDB secara real-time (incremental)
           const savedCount = await this.toolsService.upsertByGithubIdBulk(mapped);
+
+          // Upload avatar ke MinIO di background (asinkron tanpa menghambat)
+          this.processMinioUploadsInBackground(mapped);
+
           this.logger.log(
             `    ↳ Hal ${page}: +${mapped.length} repo (${savedCount} tersimpan ke DB) | Total Strategy 1: ${results.length}`,
           );
@@ -462,6 +466,7 @@ export class IngestionService implements OnModuleInit {
         if (mapped.length > 0) {
           results.push(...mapped);
           const savedCount = await this.toolsService.upsertByGithubIdBulk(mapped);
+          this.processMinioUploadsInBackground(mapped);
           this.logger.log(
             `    ↳ +${mapped.length} repo (${savedCount} tersimpan ke DB) | Total Strategy 2: ${results.length}`,
           );
@@ -498,6 +503,7 @@ export class IngestionService implements OnModuleInit {
         if (mapped.length > 0) {
           results.push(...mapped);
           const savedCount = await this.toolsService.upsertByGithubIdBulk(mapped);
+          this.processMinioUploadsInBackground(mapped);
           this.logger.log(
             `    ↳ +${mapped.length} repo (${savedCount} tersimpan ke DB) | Total Strategy 3: ${results.length}`,
           );
@@ -531,6 +537,7 @@ export class IngestionService implements OnModuleInit {
         if (mapped.length > 0) {
           results.push(...mapped);
           const savedCount = await this.toolsService.upsertByGithubIdBulk(mapped);
+          this.processMinioUploadsInBackground(mapped);
           this.logger.log(
             `    ↳ +${mapped.length} repo (${savedCount} tersimpan ke DB) | Total Strategy 4: ${results.length}`,
           );
@@ -690,9 +697,8 @@ export class IngestionService implements OnModuleInit {
 
     for (let i = 0; i < tools.length; i += BATCH_SIZE) {
       const batch = tools.slice(i, i + BATCH_SIZE);
-      const enriched = await this.enrichWithMinioIcons(batch);
-
-      const count = await this.toolsService.upsertByGithubIdBulk(enriched);
+      const count = await this.toolsService.upsertByGithubIdBulk(batch);
+      this.processMinioUploadsInBackground(batch);
       saved += count;
 
       const pct = Math.min(((i + BATCH_SIZE) / tools.length) * 100, 100).toFixed(0);
@@ -705,38 +711,80 @@ export class IngestionService implements OnModuleInit {
   }
 
   /**
-   * Download icon dari GitHub avatar dan upload ke MinIO (best-effort).
-   * Jika gagal, gunakan URL asli dari GitHub (tetap valid).
+   * Upload gambar avatar GitHub ke MinIO secara asinkron di background,
+   * lalu perbarui URL icon di MongoDB setelah berhasil tersimpan di MinIO.
    */
-  private async enrichWithMinioIcons(tools: any[]): Promise<any[]> {
-    const enriched: any[] = [];
+  private processMinioUploadsInBackground(tools: any[]): void {
+    // Jalankan di background tanpa menahan proses utama
+    (async () => {
+      const BATCH_SIZE = 10; // 10 upload paralel sekaligus
+      for (let i = 0; i < tools.length; i += BATCH_SIZE) {
+        const chunk = tools.slice(i, i + BATCH_SIZE);
+        await Promise.all(
+          chunk.map(async (tool) => {
+            if (
+              tool.icon_url &&
+              tool.icon_url.includes('avatars.githubusercontent.com')
+            ) {
+              try {
+                const safeName = tool.title
+                  .toLowerCase()
+                  .replace(/[^a-z0-9]/g, '-')
+                  .replace(/-+/g, '-')
+                  .substring(0, 60);
+                const objectName = `github-${tool.github_id || tool.title}-${safeName}.png`;
 
-    for (const tool of tools) {
-      let finalIconUrl = tool.icon_url;
+                const minioUrl = await this.minioService.downloadAndUpload(
+                  tool.icon_url,
+                  objectName,
+                );
 
-      // Hanya upload avatar GitHub (bukan dicebear placeholder)
-      if (tool.icon_url && tool.icon_url.includes('avatars.githubusercontent.com')) {
-        try {
-          const safeName = tool.title
-            .toLowerCase()
-            .replace(/[^a-z0-9]/g, '-')
-            .replace(/-+/g, '-')
-            .substring(0, 60);
-          const objectName = `github-${tool.github_id}-${safeName}.png`;
-
-          finalIconUrl = await this.minioService.downloadAndUpload(
-            tool.icon_url,
-            objectName,
-          );
-        } catch {
-          // Biarkan icon_url tetap dari GitHub — masih valid
-        }
+                if (minioUrl) {
+                  // Update record di MongoDB dengan URL MinIO yang baru
+                  if (tool.github_id) {
+                    await this.toolsService.upsertByGithubId(tool.github_id, {
+                      icon_url: minioUrl,
+                    });
+                  } else if (tool.title) {
+                    await this.toolsService.upsertByTitle({
+                      title: tool.title,
+                      description: tool.description,
+                      category: tool.category,
+                      icon_url: minioUrl,
+                    });
+                  }
+                }
+              } catch {
+                // Jika MinIO gagal, tetapkan URL GitHub asli (tetap valid)
+              }
+            }
+          }),
+        );
       }
+    })().catch((err) =>
+      this.logger.debug(`Background MinIO sync note: ${err.message}`),
+    );
+  }
 
-      enriched.push({ ...tool, icon_url: finalIconUrl });
-    }
+  /**
+   * Sync semua icon tool yang ada di database ke MinIO di background
+   */
+  async syncAllIconsToMinio(): Promise<{ synced: number; total: number }> {
+    this.logger.log('🔄 Memulai sinkronisasi seluruh gambar icon ke MinIO...');
+    const rawTools = await this.toolsService.findAllRaw();
+    const githubTools = rawTools.filter(
+      (t) => t.icon_url && t.icon_url.includes('avatars.githubusercontent.com'),
+    );
 
-    return enriched;
+    this.logger.log(`Ditemukan ${githubTools.length} gambar yang akan diupload ke MinIO.`);
+
+    // Jalankan upload background
+    this.processMinioUploadsInBackground(githubTools);
+
+    return {
+      synced: githubTools.length,
+      total: rawTools.length,
+    };
   }
 
   /** Sleep helper */
@@ -774,8 +822,13 @@ export class IngestionService implements OnModuleInit {
       this.logger.error(`Manual ingestion error: ${err.message}`),
     );
 
+    // Sinkronkan juga seluruh gambar yang ada di DB ke MinIO secara asinkron
+    this.syncAllIconsToMinio().catch((err) =>
+      this.logger.error(`MinIO sync error: ${err.message}`),
+    );
+
     return {
-      message: 'Proses crawling 5.000-7.000 data GitHub telah dimulai di background. Silakan pantau log terminal backend.',
+      message: 'Proses crawling 5.000-7.000 data GitHub dan sinkronisasi MinIO telah dimulai di background. Silakan pantau log terminal backend.',
       status: 'started',
     };
   }
