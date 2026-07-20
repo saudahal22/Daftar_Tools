@@ -53,6 +53,22 @@ export class Tool {
   original_icon_url: string;
 
   @ApiProperty({
+    description: 'ID unik repository dari GitHub (untuk deduplication)',
+    example: 123456789,
+    required: false,
+  })
+  @Prop({ type: Number, index: true, sparse: true })
+  github_id?: number;
+
+  @ApiProperty({
+    description: 'Jumlah bintang repository GitHub',
+    example: 1234,
+    required: false,
+  })
+  @Prop({ type: Number, default: 0 })
+  stars?: number;
+
+  @ApiProperty({
     description: 'Vector embedding untuk AI recommendation (TF-IDF atau model)',
     type: [Number],
   })
@@ -64,3 +80,5 @@ export const ToolSchema = SchemaFactory.createForClass(Tool);
 
 // Create text index for full-text search on title and description
 ToolSchema.index({ title: 'text', description: 'text', tags: 'text' });
+// Sparse unique index on github_id (allows multiple documents without github_id)
+ToolSchema.index({ github_id: 1 }, { unique: true, sparse: true });

@@ -14,14 +14,15 @@ export class IngestionController {
   @ApiOperation({
     summary: 'Trigger data ingestion secara manual',
     description:
-      'Menjalankan proses ingestion data dari RapidAPI (atau seed data) ' +
-      'secara manual. Gambar akan didownload dan diupload ke MinIO.',
+      'Menjalankan proses crawling data tools IT open-source dari GitHub Public REST API ' +
+      'secara manual. Gambar avatar repository akan didownload dan diupload ke MinIO.',
   })
   @ApiResponse({
     status: 201,
-    description: 'Ingestion berhasil dijalankan',
+    description: 'Ingestion berhasil dimulai di background',
   })
   async triggerIngestion() {
     return this.ingestionService.triggerIngestion();
   }
 }
+

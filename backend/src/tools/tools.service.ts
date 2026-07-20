@@ -146,6 +146,52 @@ export class ToolsService {
   }
 
   /**
+   * Upsert tool berdasarkan GitHub ID (lebih akurat, tidak duplikat)
+   */
+  async upsertByGithubId(
+    githubId: number,
+    toolData: any,
+  ): Promise<ToolDocument> {
+    const existing = await this.toolModel
+      .findOneAndUpdate(
+        { github_id: githubId },
+        { $set: toolData },
+        { new: true, upsert: true },
+      )
+      .exec();
+
+    return existing;
+  }
+
+  /**
+   * Bulk upsert berdasarkan GitHub ID — lebih efisien untuk batch processing
+   */
+  async upsertByGithubIdBulk(tools: any[]): Promise<number> {
+    if (!tools || tools.length === 0) return 0;
+
+    const ops = tools.map((tool) => ({
+      updateOne: {
+        filter: { github_id: tool.github_id },
+        update: { $set: tool },
+        upsert: true,
+      },
+    }));
+
+    try {
+      const result = await this.toolModel.bulkWrite(ops, { ordered: false });
+      return (result.upsertedCount || 0) + (result.modifiedCount || 0);
+    } catch (err: any) {
+      // BulkWriteError: partial success is acceptable (duplicate key errors)
+      if (err?.result) {
+        return (
+          (err.result.nUpserted || 0) + (err.result.nModified || 0)
+        );
+      }
+      throw err;
+    }
+  }
+
+  /**
    * Mendapatkan semua kategori unik
    */
   async getCategories(): Promise<string[]> {

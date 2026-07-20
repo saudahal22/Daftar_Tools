@@ -27,13 +27,13 @@ async function bootstrap() {
     .setTitle('Katalog Open Source IT Tools')
     .setDescription(
       'API untuk mengelola katalog tool IT open-source. ' +
-      'Mendukung CRUD, pencarian, filtering, data ingestion dari RapidAPI, ' +
+      'Mendukung CRUD, pencarian, filtering, data ingestion dari GitHub Public REST API, ' +
       'penyimpanan gambar di MinIO, dan rekomendasi AI.',
     )
     .setVersion('1.0')
     .addTag('tools', 'Endpoint CRUD dan pencarian tool')
     .addTag('recommend', 'Endpoint rekomendasi AI')
-    .addTag('ingestion', 'Endpoint data ingestion dari RapidAPI')
+    .addTag('ingestion', 'Endpoint data ingestion dari GitHub Public REST API')
     .build();
 
   const document = SwaggerModule.createDocument(app, swaggerConfig);
