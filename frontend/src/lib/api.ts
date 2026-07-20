@@ -1,4 +1,16 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+function getApiBaseUrl(): string {
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL;
+  }
+  if (typeof window !== 'undefined') {
+    const origin = window.location.origin;
+    // Auto-detect GitHub Codespaces domain URL pattern
+    if (origin.includes('app.github.dev')) {
+      return origin.replace('-3000.', '-3001.');
+    }
+  }
+  return 'http://localhost:3001';
+}
 
 export interface Tool {
   _id: string;
@@ -43,7 +55,7 @@ export async function fetchTools(params?: {
   if (params?.page) query.set('page', String(params.page));
   if (params?.limit) query.set('limit', String(params.limit));
 
-  const res = await fetch(`${API_BASE}/api/tools?${query.toString()}`, {
+  const res = await fetch(`${getApiBaseUrl()}/api/tools?${query.toString()}`, {
     cache: 'no-store',
   });
 
@@ -55,7 +67,7 @@ export async function fetchTools(params?: {
  * Fetch tool berdasarkan ID
  */
 export async function fetchTool(id: string): Promise<Tool> {
-  const res = await fetch(`${API_BASE}/api/tools/${id}`, {
+  const res = await fetch(`${getApiBaseUrl()}/api/tools/${id}`, {
     cache: 'no-store',
   });
 
@@ -70,7 +82,7 @@ export async function updateTool(
   id: string,
   data: Partial<Tool>,
 ): Promise<Tool> {
-  const res = await fetch(`${API_BASE}/api/tools/${id}`, {
+  const res = await fetch(`${getApiBaseUrl()}/api/tools/${id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
@@ -86,7 +98,7 @@ export async function updateTool(
 export async function getRecommendation(
   question: string,
 ): Promise<RecommendResponse> {
-  const res = await fetch(`${API_BASE}/api/recommend`, {
+  const res = await fetch(`${getApiBaseUrl()}/api/recommend`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ question }),
@@ -100,7 +112,7 @@ export async function getRecommendation(
  * Fetch semua kategori unik
  */
 export async function fetchCategories(): Promise<string[]> {
-  const res = await fetch(`${API_BASE}/api/tools/categories`, {
+  const res = await fetch(`${getApiBaseUrl()}/api/tools/categories`, {
     cache: 'no-store',
   });
 
@@ -115,7 +127,7 @@ export async function triggerIngestion(): Promise<{
   message: string;
   count: number;
 }> {
-  const res = await fetch(`${API_BASE}/api/ingestion/trigger`, {
+  const res = await fetch(`${getApiBaseUrl()}/api/ingestion/trigger`, {
     method: 'POST',
   });
 
