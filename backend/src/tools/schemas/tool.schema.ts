@@ -82,3 +82,5 @@ export const ToolSchema = SchemaFactory.createForClass(Tool);
 ToolSchema.index({ title: 'text', description: 'text', tags: 'text' });
 // Sparse unique index on github_id (allows multiple documents without github_id)
 ToolSchema.index({ github_id: 1 }, { unique: true, sparse: true });
+// Index on createdAt for fast pagination sorting
+ToolSchema.index({ createdAt: -1 });
