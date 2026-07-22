@@ -258,11 +258,20 @@ export default function HomePage() {
                     </button>
 
                     <div className="flex items-center gap-1">
-                      {[...Array(Math.min(5, toolsData.totalPages))].map((_, idx) => {
-                        let pageNum = page - 2 + idx;
-                        if (pageNum < 1) pageNum = idx + 1;
-                        if (pageNum > toolsData.totalPages) return null;
-                        return (
+                      {(() => {
+                        const total = toolsData.totalPages;
+                        const current = page;
+                        const maxButtons = 5;
+                        let start = Math.max(1, current - 2);
+                        let end = Math.min(total, start + maxButtons - 1);
+                        if (end - start + 1 < maxButtons) {
+                          start = Math.max(1, end - maxButtons + 1);
+                        }
+                        const pages = [];
+                        for (let p = start; p <= end; p++) {
+                          pages.push(p);
+                        }
+                        return pages.map((pageNum) => (
                           <button
                             key={pageNum}
                             onClick={() => setPage(pageNum)}
@@ -274,8 +283,8 @@ export default function HomePage() {
                           >
                             {pageNum}
                           </button>
-                        );
-                      })}
+                        ));
+                      })()}
                     </div>
 
                     <button

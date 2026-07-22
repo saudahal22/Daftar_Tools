@@ -1,6 +1,6 @@
 'use client';
 
-import { Tool } from '@/lib/api';
+import { Tool, resolveImageUrl } from '@/lib/api';
 
 interface ToolCardProps {
   tool: Tool;
@@ -9,7 +9,7 @@ interface ToolCardProps {
 
 export default function ToolCard({ tool, onEdit }: ToolCardProps) {
   // Placeholder icon jika tidak ada icon_url
-  const iconSrc = tool.icon_url || null;
+  const iconSrc = tool.icon_url ? resolveImageUrl(tool.icon_url) : null;
 
   return (
     <div className="glass-card card-animate p-6 flex flex-col h-full group">

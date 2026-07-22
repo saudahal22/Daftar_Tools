@@ -193,3 +193,27 @@ export async function triggerIngestion(): Promise<{
 
   return res.json();
 }
+
+/**
+ * Resolves MinIO localhost:9000 (or internal minio:9000) URLs to Codespaces port 9000 if running in Codespaces,
+ * or returns it as-is.
+ */
+export function resolveImageUrl(url: string | null | undefined): string {
+  if (!url) return '';
+  
+  if (typeof window !== 'undefined') {
+    const origin = window.location.origin;
+    // Auto-detect GitHub Codespaces domain URL pattern
+    const codespaceRegex = /-[0-9]+(?=\.(?:preview\.)?(?:app\.)?github\.dev)/;
+    if (codespaceRegex.test(origin)) {
+      // If URL points to localhost:9000 or minio:9000, rewrite to Codespace port 9000 URL
+      if (url.includes('localhost:9000') || url.includes('minio:9000')) {
+        const rewritten = origin.replace(codespaceRegex, '-9000');
+        // Extract the path from localhost:9000/path
+        const urlObj = new URL(url.replace('minio:9000', 'localhost:9000'));
+        return `${rewritten}${urlObj.pathname}${urlObj.search}`;
+      }
+    }
+  }
+  return url;
+}
