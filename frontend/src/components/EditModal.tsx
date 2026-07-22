@@ -136,7 +136,7 @@ export default function EditModal({
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[calc(100vh-160px)] overflow-y-auto">
           {/* Title */}
           <div>
             <label className="block text-sm font-medium text-slate-300 mb-1.5">
