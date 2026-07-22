@@ -180,7 +180,9 @@ export default function HomePage() {
                 <>
                   Menampilkan{' '}
                   <span className="text-white font-semibold">
-                    {toolsData.tools.length}
+                    {toolsData.total === 0 
+                      ? 0 
+                      : `${(page - 1) * limit + 1}–${Math.min(page * limit, toolsData.total)}`}
                   </span>{' '}
                   dari{' '}
                   <span className="text-white font-semibold">
