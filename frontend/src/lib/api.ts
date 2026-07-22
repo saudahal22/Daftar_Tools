@@ -12,13 +12,14 @@ function getApiBaseUrl(): string {
     }
   }
   
-  const envUrl = process.env.NEXT_PUBLIC_API_URL;
+  const envUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
   if (envUrl) {
-    console.log("[API DEBUG] No Codespace pattern matched. Using NEXT_PUBLIC_API_URL:", envUrl);
-    return envUrl;
+    const api = envUrl.replace(/\/$/, "");
+    console.log("🌐 API BASE URL (ENV):", api);
+    return api;
   }
   
-  console.log("[API DEBUG] Fallback to default localhost:3001");
+  console.log("🌐 API BASE URL (LOCAL): http://localhost:3001");
   return 'http://localhost:3001';
 }
 
@@ -48,9 +49,6 @@ export interface RecommendResponse {
   method: string;
 }
 
-/**
- * Fetch daftar tools dengan search & filter
- */
 export async function fetchTools(params?: {
   search?: string;
   category?: string;
@@ -60,88 +58,138 @@ export async function fetchTools(params?: {
 }): Promise<ToolsResponse> {
   const query = new URLSearchParams();
 
-  if (params?.search) query.set('search', params.search);
-  if (params?.category) query.set('category', params.category);
-  if (params?.tags) query.set('tags', params.tags);
-  if (params?.page) query.set('page', String(params.page));
-  if (params?.limit) query.set('limit', String(params.limit));
+  if (params?.search) query.set("search", params.search);
+  if (params?.category) query.set("category", params.category);
+  if (params?.tags) query.set("tags", params.tags);
+  if (params?.page) query.set("page", String(params.page));
+  if (params?.limit) query.set("limit", String(params.limit));
 
-  const res = await fetch(`${getApiBaseUrl()}/api/tools?${query.toString()}`, {
-    cache: 'no-store',
-  });
+  const url = `${getApiBaseUrl()}/api/tools?${query.toString()}`;
 
-  if (!res.ok) throw new Error('Gagal mengambil data tools');
-  return res.json();
+  console.log("📤 FETCH TOOLS:", url);
+
+  try {
+    const res = await fetch(url, {
+      cache: "no-store",
+    });
+
+    console.log("📥 STATUS:", res.status);
+
+    if (!res.ok) {
+      throw new Error(
+        `HTTP ${res.status} ${res.statusText}`
+      );
+    }
+
+    return res.json();
+  } catch (err) {
+    console.error("❌ fetchTools ERROR:", err);
+    throw err;
+  }
 }
 
-/**
- * Fetch tool berdasarkan ID
- */
 export async function fetchTool(id: string): Promise<Tool> {
-  const res = await fetch(`${getApiBaseUrl()}/api/tools/${id}`, {
-    cache: 'no-store',
+  const url = `${getApiBaseUrl()}/api/tools/${id}`;
+
+  console.log("📤 FETCH TOOL:", url);
+
+  const res = await fetch(url, {
+    cache: "no-store",
   });
 
-  if (!res.ok) throw new Error('Tool tidak ditemukan');
+  console.log("📥 STATUS:", res.status);
+
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}`);
+  }
+
   return res.json();
 }
 
-/**
- * Update tool (PATCH) — digunakan oleh Edit Modal
- */
 export async function updateTool(
   id: string,
-  data: Partial<Tool>,
+  data: Partial<Tool>
 ): Promise<Tool> {
-  const res = await fetch(`${getApiBaseUrl()}/api/tools/${id}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+  const url = `${getApiBaseUrl()}/api/tools/${id}`;
+
+  console.log("📤 UPDATE:", url);
+
+  const res = await fetch(url, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+    },
     body: JSON.stringify(data),
   });
 
-  if (!res.ok) throw new Error('Gagal memperbarui tool');
+  console.log("📥 STATUS:", res.status);
+
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}`);
+  }
+
   return res.json();
 }
 
-/**
- * Dapatkan rekomendasi AI
- */
 export async function getRecommendation(
-  question: string,
+  question: string
 ): Promise<RecommendResponse> {
-  const res = await fetch(`${getApiBaseUrl()}/api/recommend`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+  const url = `${getApiBaseUrl()}/api/recommend`;
+
+  console.log("📤 RECOMMEND:", url);
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
     body: JSON.stringify({ question }),
   });
 
-  if (!res.ok) throw new Error('Gagal mendapatkan rekomendasi');
+  console.log("📥 STATUS:", res.status);
+
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}`);
+  }
+
   return res.json();
 }
 
-/**
- * Fetch semua kategori unik
- */
 export async function fetchCategories(): Promise<string[]> {
-  const res = await fetch(`${getApiBaseUrl()}/api/tools/categories`, {
-    cache: 'no-store',
+  const url = `${getApiBaseUrl()}/api/tools/categories`;
+
+  console.log("📤 CATEGORIES:", url);
+
+  const res = await fetch(url, {
+    cache: "no-store",
   });
 
-  if (!res.ok) return [];
+  console.log("📥 STATUS:", res.status);
+
+  if (!res.ok) {
+    return [];
+  }
+
   return res.json();
 }
 
-/**
- * Trigger data ingestion secara manual
- */
 export async function triggerIngestion(): Promise<{
   message: string;
   count: number;
 }> {
-  const res = await fetch(`${getApiBaseUrl()}/api/ingestion/trigger`, {
-    method: 'POST',
+  const url = `${getApiBaseUrl()}/api/ingestion/trigger`;
+
+  console.log("📤 INGESTION:", url);
+
+  const res = await fetch(url, {
+    method: "POST",
   });
 
-  if (!res.ok) throw new Error('Gagal menjalankan ingestion');
+  console.log("📥 STATUS:", res.status);
+
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}`);
+  }
+
   return res.json();
 }
