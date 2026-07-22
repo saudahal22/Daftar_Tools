@@ -101,13 +101,38 @@ export class MinioService implements OnModuleInit {
       );
       const port = this.configService.get<string>('MINIO_PORT', '9000');
 
-      const url = `http://${endpoint}:${port}/${this.bucketName}/${objectName}`;
+      const internalUrl = `http://${endpoint}:${port}/${this.bucketName}/${objectName}`;
+      const url = this.toExternalUrl(internalUrl);
       this.logger.log(`File berhasil diupload: ${url}`);
       return url;
     } catch (error) {
       this.logger.error(`Gagal upload file: ${error.message}`);
       throw error;
     }
+  }
+
+  /**
+   * Mengubah URL internal MinIO menjadi URL external yang bisa diakses client
+   */
+  toExternalUrl(url: string): string {
+    if (!url) return url;
+
+    const endpoint = this.configService.get<string>('MINIO_ENDPOINT', 'minio');
+    const port = this.configService.get<string>('MINIO_PORT', '9000');
+    const internalPrefix = `${endpoint}:${port}`;
+
+    if (url.includes(internalPrefix)) {
+      let externalUrl = this.configService.get<string>('MINIO_EXTERNAL_URL');
+      if (!externalUrl) {
+        externalUrl = 'http://localhost:9000';
+      }
+      const escapeRegex = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const protocolMatch = url.match(new RegExp(`^(https?://)?${escapeRegex(internalPrefix)}`));
+      if (protocolMatch) {
+        return url.replace(protocolMatch[0], externalUrl);
+      }
+    }
+    return url;
   }
 
   /**

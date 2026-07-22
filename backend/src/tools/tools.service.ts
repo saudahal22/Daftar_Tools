@@ -4,6 +4,7 @@ import { Model } from 'mongoose';
 import { Tool, ToolDocument } from './schemas/tool.schema';
 import { CreateToolDto } from './dto/create-tool.dto';
 import { UpdateToolDto } from './dto/update-tool.dto';
+import { MinioService } from '../minio/minio.service';
 
 @Injectable()
 export class ToolsService {
@@ -11,7 +12,18 @@ export class ToolsService {
 
   constructor(
     @InjectModel(Tool.name) private toolModel: Model<ToolDocument>,
+    private readonly minioService: MinioService,
   ) {}
+
+  /**
+   * Helper untuk merubah icon_url internal menjadi external URL sebelum dikirim ke client
+   */
+  private transformTool(tool: ToolDocument): ToolDocument {
+    if (tool && tool.icon_url) {
+      tool.icon_url = this.minioService.toExternalUrl(tool.icon_url);
+    }
+    return tool;
+  }
 
   /**
    * Membuat tool baru
@@ -19,7 +31,8 @@ export class ToolsService {
   async create(createToolDto: CreateToolDto): Promise<ToolDocument> {
     const created = new this.toolModel(createToolDto);
     this.logger.log(`Creating tool: ${createToolDto.title}`);
-    return created.save();
+    const saved = await created.save();
+    return this.transformTool(saved);
   }
 
   /**
@@ -80,6 +93,8 @@ export class ToolsService {
       this.toolModel.countDocuments(filter).exec(),
     ]);
 
+    tools.forEach((t) => this.transformTool(t));
+
     return {
       tools,
       total,
@@ -96,7 +111,7 @@ export class ToolsService {
     if (!tool) {
       throw new NotFoundException(`Tool dengan ID "${id}" tidak ditemukan`);
     }
-    return tool;
+    return this.transformTool(tool);
   }
 
   /**
@@ -115,7 +130,7 @@ export class ToolsService {
     }
 
     this.logger.log(`Updated tool: ${updated.title} (${id})`);
-    return updated;
+    return this.transformTool(updated);
   }
 
   /**
@@ -142,7 +157,7 @@ export class ToolsService {
       )
       .exec();
 
-    return existing;
+    return this.transformTool(existing);
   }
 
   /**
@@ -160,7 +175,7 @@ export class ToolsService {
       )
       .exec();
 
-    return existing;
+    return this.transformTool(existing);
   }
 
   /**
@@ -202,6 +217,8 @@ export class ToolsService {
    * Mendapatkan semua tools (tanpa pagination, untuk AI recommendation)
    */
   async findAllRaw(): Promise<ToolDocument[]> {
-    return this.toolModel.find().exec();
+    const tools = await this.toolModel.find().exec();
+    tools.forEach((t) => this.transformTool(t));
+    return tools;
   }
 }

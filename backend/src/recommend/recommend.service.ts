@@ -3,6 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Tool, ToolDocument } from '../tools/schemas/tool.schema';
 import { ToolsService } from '../tools/tools.service';
+import { MinioService } from '../minio/minio.service';
 
 /**
  * RecommendService — Logika rekomendasi AI untuk tool IT.
@@ -57,6 +58,7 @@ export class RecommendService {
   constructor(
     @InjectModel(Tool.name) private toolModel: Model<ToolDocument>,
     private readonly toolsService: ToolsService,
+    private readonly minioService: MinioService,
   ) {}
 
   /**
@@ -69,15 +71,15 @@ export class RecommendService {
   }> {
     this.logger.log(`Recommendation request: "${question}"`);
 
+    let tools: ToolDocument[] = [];
+    let method = 'keyword_matching';
+
     // Coba Vector Search dulu (jika di MongoDB Atlas)
     try {
       const vectorResults = await this.vectorSearch(question);
       if (vectorResults.length > 0) {
-        return {
-          answer: this.generateAnswer(question, vectorResults),
-          tools: vectorResults,
-          method: 'vector_search',
-        };
+        tools = vectorResults;
+        method = 'vector_search';
       }
     } catch (error) {
       this.logger.warn(
@@ -85,12 +87,23 @@ export class RecommendService {
       );
     }
 
-    // Fallback: Keyword Matching
-    const keywordResults = await this.keywordSearch(question);
+    if (tools.length === 0) {
+      // Fallback: Keyword Matching
+      tools = await this.keywordSearch(question);
+      method = 'keyword_matching';
+    }
+
+    // Transform MinIO icon URLs to external URLs
+    tools.forEach((tool) => {
+      if (tool && tool.icon_url) {
+        tool.icon_url = this.minioService.toExternalUrl(tool.icon_url);
+      }
+    });
+
     return {
-      answer: this.generateAnswer(question, keywordResults),
-      tools: keywordResults,
-      method: 'keyword_matching',
+      answer: this.generateAnswer(question, tools),
+      tools,
+      method,
     };
   }
 
