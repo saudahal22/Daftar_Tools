@@ -1,15 +1,20 @@
 function getApiBaseUrl(): string {
   if (typeof window !== 'undefined') {
     const origin = window.location.origin;
+    console.log("[API DEBUG] window.location.origin:", origin);
     // Auto-detect GitHub Codespaces domain URL pattern (handles .github.dev, .app.github.dev, and preview.app.github.dev)
     const codespaceRegex = /-[0-9]+(?=\.(?:preview\.)?(?:app\.)?github\.dev)/;
     if (codespaceRegex.test(origin)) {
-      return origin.replace(codespaceRegex, '-3001');
+      const rewritten = origin.replace(codespaceRegex, '-3001');
+      console.log("[API DEBUG] Codespace detected, returning rewritten API URL:", rewritten);
+      return rewritten;
     }
   }
   if (process.env.NEXT_PUBLIC_API_URL) {
+    console.log("[API DEBUG] Fallback to process.env.NEXT_PUBLIC_API_URL:", process.env.NEXT_PUBLIC_API_URL);
     return process.env.NEXT_PUBLIC_API_URL;
   }
+  console.log("[API DEBUG] Fallback to default localhost:3001");
   return 'http://localhost:3001';
 }
 
