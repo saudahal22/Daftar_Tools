@@ -1,16 +1,18 @@
 function getApiBaseUrl(): string {
+  if (typeof window !== 'undefined') {
+    const origin = window.location.origin;
+    // Auto-detect GitHub Codespaces domain URL pattern (handles .github.dev, .app.github.dev, and preview.app.github.dev)
+    const codespaceRegex = /-[0-9]+(?=\.(?:preview\.)?(?:app\.)?github\.dev)/;
+    if (codespaceRegex.test(origin)) {
+      return origin.replace(codespaceRegex, '-3001');
+    }
+  }
   if (process.env.NEXT_PUBLIC_API_URL) {
     return process.env.NEXT_PUBLIC_API_URL;
   }
-  if (typeof window !== 'undefined') {
-    const origin = window.location.origin;
-    // Auto-detect GitHub Codespaces domain URL pattern
-    if (origin.includes('app.github.dev')) {
-      return origin.replace('-3000.', '-3001.');
-    }
-  }
   return 'http://localhost:3001';
 }
+
 
 export interface Tool {
   _id: string;
